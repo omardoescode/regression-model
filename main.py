@@ -1,4 +1,3 @@
-import math
 from typing import Callable, Tuple
 
 import numpy as np
@@ -56,8 +55,6 @@ def compute_gradient(
 def gradient_descent(
     inputs: np.ndarray,
     output: np.ndarray,
-    w_in: np.ndarray,
-    b_in: float,
     learning_step: float,
     num_iterations: int,
     compute_gradient: Callable[
@@ -71,14 +68,15 @@ def gradient_descent(
     Args:
       w_in,b_in: initial values of model parameters
     """
-    w, b = w_in, b_in
+    w = np.zeros(inputs.shape[1])
+    b = 0
     for i in range(num_iterations):
         dj_dw, dj_db = compute_gradient(inputs, output, w, b)
 
         w -= learning_step * dj_dw
         b -= learning_step * dj_db
 
-        if i % 10 == 0:
+        if i % 300 == 0:
             print(
                 f"Iteration = {i}, w = {w}, b = {b}, cost = {cost_function(lambda x: np.dot(x, w) + b, inputs, output)}"
             )
@@ -87,16 +85,27 @@ def gradient_descent(
 
 
 def main():
-    df = pd.read_csv("./resources/housing.csv")
-    inputs_columns = ["total_rooms", "total_bedrooms"]
-    output_column = "median_house_value"
+    df = pd.read_csv("./resources/social-media-addiction.csv")
+    inputs_columns = [
+        "Avg_Daily_Usage_Hours",
+        "Age",
+        "Mental_Health_Score",
+        "Sleep_Hours_Per_Night",
+    ]
+    output_column = "Addicted_Score"
 
     df = df.dropna(subset=inputs_columns + [output_column])
 
-    inputs: np.ndarray = df[inputs_columns].to_numpy()
-    output: np.ndarray = df[output_column].to_numpy()
+    # Outlier removal using z-score
+    for col in inputs_columns + [output_column]:
+        mean = df[col].mean()
+        std = df[col].std()
+        df = df[(np.abs(df[col] - mean) / std) <= 2]  # Keep values with |z| <= 3
 
-    print(inputs)
+    # Convert to NumPy arrays
+    inputs = df[inputs_columns].to_numpy()
+    output = df[output_column].to_numpy()
+    output_copy = output.copy()
 
     for i, _ in enumerate(inputs_columns):
         inputs[:, i], *_ = normalize(inputs[:, i])
@@ -106,16 +115,19 @@ def main():
     w, b = gradient_descent(
         inputs,
         output,
-        np.array([1.0, 2.0]),
-        2,
         1e-2,
-        1000,
+        10000,
         compute_gradient,
         cost_function,
     )
-    print(w, b)
     func = lambda x: np.dot(w, x) + b
     print(cost_function(func, inputs, output))
+
+    print("Testing some values: ")
+
+    random_indices = np.random.choice(len(inputs), size=50, replace=False)
+    for i in random_indices:
+        print(f"Output: {output_copy[i]}, prediction: {mu + func(inputs[i]) * std}")
 
 
 if __name__ == "__main__":
