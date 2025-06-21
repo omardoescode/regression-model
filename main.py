@@ -84,6 +84,19 @@ def gradient_descent(
     return w, b
 
 
+def predict(
+    func: Callable[[np.ndarray], float], input_stats, output_stat, input: np.ndarray
+):
+    normalized_input = np.array(
+        [
+            (input[i] - input_stats[i]["mean"]) / input_stats[i]["std"]
+            for i in range(len(input))
+        ]
+    )
+    normalized = func(normalized_input)
+    return output_stat["mean"] + normalized * output_stat["std"]
+
+
 def main():
     df = pd.read_csv("./resources/social-media-addiction.csv")
     inputs_columns = [
@@ -100,17 +113,19 @@ def main():
     for col in inputs_columns + [output_column]:
         mean = df[col].mean()
         std = df[col].std()
-        df = df[(np.abs(df[col] - mean) / std) <= 2]  # Keep values with |z| <= 3
+        df = df[(np.abs(df[col] - mean) / std) <= 2]  # Keep values with |z| <= 2
 
     # Convert to NumPy arrays
     inputs = df[inputs_columns].to_numpy()
     output = df[output_column].to_numpy()
-    output_copy = output.copy()
 
-    for i, _ in enumerate(inputs_columns):
-        inputs[:, i], *_ = normalize(inputs[:, i])
+    input_stats = []
+    for i, col in enumerate(inputs_columns):
+        inputs[:, i], mu, std = normalize(inputs[:, i])
+        input_stats.append({"mean": mu, "std": std})
 
-    output, mu, std = normalize(output)
+    output_stats = {}
+    output, output_stats["mean"], output_stats["std"] = normalize(output)
 
     w, b = gradient_descent(
         inputs,
@@ -124,10 +139,7 @@ def main():
     print(cost_function(func, inputs, output))
 
     print("Testing some values: ")
-
-    random_indices = np.random.choice(len(inputs), size=50, replace=False)
-    for i in random_indices:
-        print(f"Output: {output_copy[i]}, prediction: {mu + func(inputs[i]) * std}")
+    print(predict(func, input_stats, output_stats, np.array([8, 14, 6, 8])))
 
 
 if __name__ == "__main__":
